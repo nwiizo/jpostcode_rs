@@ -1,6 +1,6 @@
 [package]
 name = "jpostcode_rs"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "Japanese postal code lookup library in Rust, powered by jpostcode-data"
 license = "MIT"
