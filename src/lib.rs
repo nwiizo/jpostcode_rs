@@ -74,21 +74,36 @@ impl Address {
     }
 }
 
-static ADDRESS_MAP: Lazy<HashMap<String, Address>> = Lazy::new(|| {
+static ADDRESS_MAP: Lazy<HashMap<String, Vec<Address>>> = Lazy::new(|| {
     let data = include_str!(concat!(env!("OUT_DIR"), "/address_data.json"));
     let raw_map: HashMap<String, Value> =
         serde_json::from_str(data).expect("Failed to parse raw data");
 
-    raw_map
-        .into_iter()
-        .filter_map(|(k, v)| match serde_json::from_value(v) {
-            Ok(addr) => Some((k, addr)),
-            Err(_) => None,
-        })
-        .collect()
+    let mut result: HashMap<String, Vec<Address>> = HashMap::new();
+
+    for (k, v) in raw_map {
+        match v {
+            Value::Array(arr) => {
+                let addresses: Vec<Address> = arr
+                    .into_iter()
+                    .filter_map(|addr_value| serde_json::from_value(addr_value).ok())
+                    .collect();
+                if !addresses.is_empty() {
+                    result.insert(k, addresses);
+                }
+            }
+            Value::Object(_) => {
+                if let Ok(addr) = serde_json::from_value(v) {
+                    result.insert(k, vec![addr]);
+                }
+            }
+            _ => continue,
+        }
+    }
+    result
 });
 
-pub fn lookup_address(postal_code: &str) -> Result<Address, JPostError> {
+pub fn lookup_address(postal_code: &str) -> Result<Vec<Address>, JPostError> {
     if !is_valid_postal_code(postal_code) {
         return Err(JPostError::InvalidFormat);
     }
@@ -106,7 +121,7 @@ pub fn lookup_addresses(postal_code: &str) -> Result<Vec<Address>, JPostError> {
     let matches: Vec<Address> = ADDRESS_MAP
         .iter()
         .filter(|(k, _)| k.starts_with(postal_code))
-        .map(|(_, v)| v.clone())
+        .flat_map(|(_, addresses)| addresses.clone())
         .collect();
 
     if matches.is_empty() {
@@ -119,10 +134,14 @@ pub fn lookup_addresses(postal_code: &str) -> Result<Vec<Address>, JPostError> {
 pub fn search_by_address(query: &str) -> Vec<Address> {
     ADDRESS_MAP
         .values()
-        .filter(|addr| {
-            addr.full_address().contains(query) || addr.full_address_kana().contains(query)
+        .flat_map(|addresses| {
+            addresses
+                .iter()
+                .filter(|addr| {
+                    addr.full_address().contains(query) || addr.full_address_kana().contains(query)
+                })
+                .cloned()
         })
-        .cloned()
         .collect()
 }
 
@@ -143,10 +162,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_lookup_address() {
-        let result = lookup_address("0280052").unwrap();
-        assert_eq!(result.prefecture, "岩手県");
-        assert_eq!(result.city, "久慈市");
+    fn test_lookup_address_multiple() {
+        let results = lookup_address("0280052").unwrap();
+        assert!(!results.is_empty());
+        assert!(results.iter().all(|addr| addr.postcode == "0280052"));
+    }
+
+    #[test]
+    fn test_lookup_addresses() {
+        let results = lookup_addresses("028").unwrap();
+        assert!(!results.is_empty());
+        assert!(results.iter().all(|addr| addr.postcode.starts_with("028")));
     }
 
     #[test]
@@ -158,9 +184,30 @@ mod tests {
     }
 
     #[test]
-    fn test_lookup_addresses() {
-        let results = lookup_addresses("028").unwrap();
+    fn test_search_by_address() {
+        let results = search_by_address("岩手県");
         assert!(!results.is_empty());
-        assert!(results.iter().all(|addr| addr.postcode.starts_with("028")));
+        assert!(results.iter().all(|addr| addr.prefecture == "岩手県"));
+    }
+
+    #[test]
+    fn test_address_formatting() {
+        let addr = Address {
+            postcode: "0280052".to_string(),
+            prefecture: "岩手県".to_string(),
+            prefecture_kana: "イワテケン".to_string(),
+            prefecture_code: 3,
+            city: "久慈市".to_string(),
+            city_kana: "クジシ".to_string(),
+            town: "本町".to_string(),
+            town_kana: "ホンチョウ".to_string(),
+            street: None,
+            office_name: None,
+            office_name_kana: None,
+        };
+
+        assert_eq!(addr.full_address(), "岩手県久慈市本町");
+        assert_eq!(addr.full_address_kana(), "イワテケンクジシホンチョウ");
+        assert_eq!(addr.formatted(), "〒0280052 岩手県久慈市本町");
     }
 }
