@@ -1,6 +1,6 @@
 [package]
 name = "jpostcode_rs"
-version = "0.1.2"
+version = "0.1.3"
 edition = "2021"
 description = "Japanese postal code lookup library in Rust, powered by jpostcode-data"
 license = "MIT"
@@ -10,12 +10,12 @@ readme = "README.md"
 keywords = ["japan", "postal", "zipcode", "address", "lookup"]
 categories = ["parser-implementations", "data-structures"]
 include = [
-    "src/**/*",
-    "Cargo.toml",
-    "README.md",
-    "LICENSE",
-    "build.rs",
-    "json/*.json",
+   "src/**/*",
+   "Cargo.toml",
+   "README.md",
+   "LICENSE",
+   "build.rs",
+   "jpostcode-data/data/json/*.json",
 ]
 
 [dependencies]
