@@ -1,7 +1,7 @@
-use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
+use std::sync::LazyLock;
 
 mod error;
 pub use error::JPostError;
@@ -74,7 +74,7 @@ impl Address {
     }
 }
 
-static ADDRESS_MAP: Lazy<HashMap<String, Vec<Address>>> = Lazy::new(|| {
+static ADDRESS_MAP: LazyLock<HashMap<String, Vec<Address>>> = LazyLock::new(|| {
     let data = include_str!(concat!(env!("OUT_DIR"), "/address_data.json"));
     let raw_map: HashMap<String, Value> =
         serde_json::from_str(data).expect("Failed to parse raw data");
